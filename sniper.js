@@ -1,21 +1,54 @@
 /**
  * Zero-dependencies market monitor (vanilla Node.js https).
  *
- * This script is intentionally limited to safe monitoring + alerting.
- * It does NOT execute automated purchases.
+ * Safe mode: monitoring + alerting only (no auto-buy).
  */
 
 import https from 'node:https';
+import { existsSync, readFileSync } from 'node:fs';
 
 const CONFIG = {
   steamCountry: process.env.STEAM_COUNTRY || 'PT',
   steamCurrency: process.env.STEAM_CURRENCY || '3',
   steamLanguage: process.env.STEAM_LANGUAGE || 'portuguese',
   pollIntervalMs: Number(process.env.VANILLA_POLL_INTERVAL_MS || 5000),
-  maxAlertPriceEur: Number(process.env.VANILLA_MAX_ALERT_PRICE_EUR || 10),
+  priceDbFile: process.env.PRICE_OUTPUT_FILE || 'prices.json',
+  profitabilityMultiplier: Number(process.env.PROFITABILITY_MULTIPLIER || 0.8),
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || ''
 };
+
+function loadPriceDatabase() {
+  if (!existsSync(CONFIG.priceDbFile)) {
+    console.warn(`⚠️ Price database not found: ${CONFIG.priceDbFile}`);
+    return {};
+  }
+
+  try {
+    const raw = readFileSync(CONFIG.priceDbFile, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      console.warn(`⚠️ Invalid price database format in ${CONFIG.priceDbFile}`);
+      return {};
+    }
+
+    const normalized = Object.entries(parsed).reduce((acc, [name, value]) => {
+      const num = Number(value);
+      if (!Number.isNaN(num) && num > 0) {
+        acc[name] = num;
+      }
+      return acc;
+    }, {});
+
+    console.log(`Loaded ${Object.keys(normalized).length} items from price database (${CONFIG.priceDbFile}).`);
+    return normalized;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error';
+    console.warn(`⚠️ Failed to parse ${CONFIG.priceDbFile}: ${message}`);
+    return {};
+  }
+}
 
 function httpsRequest({ hostname, path, method = 'GET', headers = {}, body }) {
   return new Promise((resolve, reject) => {
@@ -85,6 +118,25 @@ function extractListings(resultsHtml) {
   return items;
 }
 
+function checkProfit(priceDb, itemName, steamPrice) {
+  const referencePrice = priceDb[itemName];
+  if (!referencePrice) return false;
+
+  const maxPurchasePrice = referencePrice * CONFIG.profitabilityMultiplier;
+
+  if (steamPrice <= maxPurchasePrice) {
+    console.log(
+      `🎯 OPORTUNIDADE: ${itemName} por €${steamPrice.toFixed(2)} (Ref: €${referencePrice.toFixed(2)}, Max: €${maxPurchasePrice.toFixed(2)})`
+    );
+    return {
+      referencePrice,
+      maxPurchasePrice
+    };
+  }
+
+  return false;
+}
+
 async function pollRecentMarket() {
   const path = `/market/recent?country=${encodeURIComponent(CONFIG.steamCountry)}&currency=${encodeURIComponent(CONFIG.steamCurrency)}&language=${encodeURIComponent(CONFIG.steamLanguage)}`;
 
@@ -110,13 +162,23 @@ async function run() {
   console.log('🚀 Vanilla monitor started (safe mode, no auto-buy).');
 
   while (true) {
+    const priceDb = loadPriceDatabase();
+
     try {
       const listings = await pollRecentMarket();
-      const opportunities = listings.filter((item) => item.priceEur <= CONFIG.maxAlertPriceEur).slice(0, 3);
 
-      for (const item of opportunities) {
-        const msg = `Opportunity: ${item.name}\nPrice: €${item.priceEur.toFixed(2)}\nListing: ${item.listingId}`;
-        console.log(msg);
+      for (const item of listings) {
+        const opportunity = checkProfit(priceDb, item.name, item.priceEur);
+        if (!opportunity) continue;
+
+        const msg = [
+          `Opportunity: ${item.name}`,
+          `Steam: €${item.priceEur.toFixed(2)}`,
+          `Reference: €${opportunity.referencePrice.toFixed(2)}`,
+          `Max buy: €${opportunity.maxPurchasePrice.toFixed(2)}`,
+          `Listing: ${item.listingId}`
+        ].join('\n');
+
         await notifyTelegram(msg);
       }
     } catch (error) {

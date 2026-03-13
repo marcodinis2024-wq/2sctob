@@ -158,3 +158,24 @@ Variáveis usadas:
 - `.env` já está no `.gitignore` para evitar leak de credenciais.
 - Arranca primeiro em modo seguro (monitorização/alertas) e valida comportamento antes de qualquer automação adicional.
 - Se aparecerem muitos erros de `429`/`403`, interrompe execução e roda com novo proxy/IP.
+
+## prices.json manual (modo imediato)
+
+Podes operar sem API externa com uma base local na raiz do projeto (`prices.json`):
+
+```json
+{
+  "AK-47 | Slate (Field-Tested)": 2.50,
+  "AWP | Atheris (Field-Tested)": 2.10,
+  "Desert Eagle | Mecha Industries (Minimal Wear)": 4.80
+}
+```
+
+A regra no `sniper.js` é:
+
+```txt
+maxPurchasePrice = referencePrice * PROFITABILITY_MULTIPLIER
+```
+
+Por default, `PROFITABILITY_MULTIPLIER=0.80`.
+O log de arranque mostra: `Loaded X items from price database`.
