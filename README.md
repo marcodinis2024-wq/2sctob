@@ -109,3 +109,52 @@ Executar:
 ```bash
 npm run vanilla:watch
 ```
+
+## Rotas de execução com rede aberta
+
+### 1) VPS (recomendado para 24/7)
+
+```bash
+git clone <teu-repo>
+cd 2sctob
+cp .env.example .env
+# preencher .env
+npm run vanilla:update-prices
+npm run vanilla:watch
+```
+
+### 2) GitHub Codespaces
+
+No GitHub: **Code → Codespaces → Create codespace on main**.
+Depois no terminal do codespace:
+
+```bash
+cp .env.example .env
+npm run vanilla:update-prices
+npm run vanilla:watch
+```
+
+### 3) Docker local
+
+```bash
+npm run docker:build
+npm run docker:run
+```
+
+## Atualização de tabela de preços (vanilla)
+
+Foi adicionado `update-prices.js` (sem dependências) para obter um feed JSON e gravar em `prices.json`.
+
+```bash
+npm run vanilla:update-prices
+```
+
+Variáveis usadas:
+- `PRICE_SOURCE_URL`
+- `PRICE_OUTPUT_FILE`
+
+## Boas práticas de segurança operacional
+
+- `.env` já está no `.gitignore` para evitar leak de credenciais.
+- Arranca primeiro em modo seguro (monitorização/alertas) e valida comportamento antes de qualquer automação adicional.
+- Se aparecerem muitos erros de `429`/`403`, interrompe execução e roda com novo proxy/IP.

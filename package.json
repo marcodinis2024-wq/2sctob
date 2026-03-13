@@ -14,7 +14,10 @@
     "check": "npm run lint && npm run build",
     "worker:watcher": "tsx src/workers/watcher.ts",
     "worker:prices": "tsx src/workers/price-updater.ts",
-    "vanilla:watch": "node sniper.js"
+    "vanilla:watch": "node sniper.js",
+    "vanilla:update-prices": "node update-prices.js",
+    "docker:build": "docker build -t cs2-sniper .",
+    "docker:run": "docker run --rm --env-file .env cs2-sniper"
   },
   "engines": {
     "node": ">=20.0.0"
