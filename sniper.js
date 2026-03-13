@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Zero-dependencies market monitor (vanilla Node.js https).
  *
@@ -7,7 +5,7 @@
  * It does NOT execute automated purchases.
  */
 
-const https = require('https');
+import https from 'node:https';
 
 const CONFIG = {
   steamCountry: process.env.STEAM_COUNTRY || 'PT',
